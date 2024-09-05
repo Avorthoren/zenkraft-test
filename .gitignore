@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*.class
+
+.idea/
+.vscode/
+venv
+/dist
+/private_dir
