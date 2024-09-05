@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Tracker</title>
+    <link rel="icon" type="image/x-icon" href="/api/static/images/favicon/favicon.ico"/>
+    <script src="/api/static/js/tracker/tracker.js" defer></script>
+</head>
+<body>
+    <div id="input">
+        <form onsubmit="trackerSubmit(); return false;">
+            <label for="tracking_number">Tracking number:</label><br/>
+            <input type="text" id="tracking_number" name="tracking_number"
+                   placeholder="000000000000000" minlength="1" maxlength="100" required><br/>
+            <input type="submit" value="Track shipment"/>
+        </form>
+    </div>
+    <hr/>
+    <div id="output"><pre id="output-data"></pre></div>
+</body>
+</html>

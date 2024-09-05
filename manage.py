@@ -15,15 +15,12 @@ define("port", default=env.PORT, help="run on the given port", type=int)
 
 # pylint: disable=bad-whitespace
 handlers = [
-	# Healthcheck
 	(r"/api/healthcheck",                           api.healthcheck.HealthCheckHandler),
-	# Version
 	(r"/api/version",                               api.version.VersionHandler),
-	# Images
-	(r"/api/static/(.*)",                           tornado.web.StaticFileHandler, {"path": "app/static/images"}),
+	(r"/api/static/(.*)",                           tornado.web.StaticFileHandler, {"path": "app/static"}),
 
 	# Front-end
-	(r"/",                                          api.tracker.TrackerHandler),
+	(r"/",                                          api.tracker.TrackerUIHandler),
 
 	# API
 	(r"/api/tracker",                               api.tracker.TrackerHandler),
