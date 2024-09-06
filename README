@@ -1,0 +1,8 @@
+Check ./run_local.sh to run application locally using docker.
+
+Check ./Makefile to build application container(s).
+
+To run it locally directly you have:
+1. ./requirements.txt for pip.
+2. ./manage.py as application entry point.
+3. ./local_env for lists of needed env vars.

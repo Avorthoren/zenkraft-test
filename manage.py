@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Main module of the program, executable."""
+"""Main module of the program, executable.
+"""
 import asyncio
 import os.path
 
@@ -36,7 +37,7 @@ class Application(tornado.web.Application):
 		with open(os.path.join(workdir, 'VERSION')) as file:
 			self.version = file.read().strip()
 
-		super(Application, self).__init__(handlers)
+		super().__init__(handlers)
 
 
 async def main():

@@ -6,4 +6,9 @@ __pycache__/
 .vscode/
 venv
 /dist
+
+VERSION
+local_env/private.env
+
+# Put your 'private' developer files here
 /private_dir

@@ -1,0 +1,21 @@
+FROM python:3.10.5-slim-bullseye
+
+RUN sed -i 's/\(bullseye main\)/\1 non-free/g' /etc/apt/sources.list && \
+	apt-get update && \
+	apt-get install -y
+
+# Install requirements.
+RUN mkdir -p /usr/bin/zenkraft-test
+COPY requirements.txt /usr/bin/zenkraft-test/
+WORKDIR /usr/bin/zenkraft-test
+RUN pip install --upgrade pip
+RUN pip install -r requirements.txt
+
+# Copy application files.
+COPY app /usr/bin/zenkraft-test/app
+COPY config.py /usr/bin/zenkraft-test/config.py
+COPY manage.py /usr/bin/zenkraft-test/manage.py
+COPY VERSION /usr/bin/zenkraft-test/VERSION
+
+CMD [ "python3", "manage.py" ]
+EXPOSE 8080

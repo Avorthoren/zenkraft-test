@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Module with health check handler required by Amazon, responds with "ok"
-to any GET/POST request
+"""Module with health check handler.
+Responds with "ok" to any GET/POST request.
 """
 import tornado.web
 
