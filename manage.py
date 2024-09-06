@@ -41,18 +41,6 @@ class Application(tornado.web.Application):
 
 async def main():
 	"""Main function of the program."""
-	# # Create new asyncio loop for server
-	# loop = asyncio.get_event_loop()
-	#
-	# tornado.options.parse_command_line()
-	# http_server = Application(loop)
-	# http_server.listen(options.port)
-	# # Rewrite config if port directly defined through command line.
-	# env.PORT = options.port
-	#
-	# # The asyncio loop created at the beginning is started now. Coroutines (and
-	# # server in general) are running from this point onwards.
-	# loop.run_forever()
 	server = Application()
 	server.listen(options.port)
 	await asyncio.Event().wait()
