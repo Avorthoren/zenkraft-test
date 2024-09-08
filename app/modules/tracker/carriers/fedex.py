@@ -10,6 +10,7 @@ number.
 Regarding SOAP: there is no reliable way of testing using their API directly,
 because response for the same number could be different each time.
 Here are some numbers which worked at least once:
+122816215025810
 61292701078443410536
 02394653018047202719
 568838414941
@@ -20,7 +21,7 @@ https://github.com/jzempel/fedex/blob/master/fedex/wsdls/beta/TrackService_v10.w
 """
 import asyncio
 import json
-from typing import Optional, Union, Callable, Awaitable
+from typing import Optional, Union, Callable, Awaitable, Protocol
 
 # httpx is used only because of zeep, and it is in zeep's dependencies.
 # If it will be removed from zeep's dependencies, we would need to rewrite code.
@@ -33,6 +34,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
 from zeep import AsyncClient as AsyncSOAPClient
 from zeep.helpers import serialize_object as zeep_serialize
 from zeep.exceptions import Error as ZeepError
+from zeep.proxy import OperationProxy as ZeepOperationProxy
 
 from app.modules.tracker.carriers.common import CarrierTrackingError
 from app.carriers_auth import fedex as fedex_auth
@@ -43,29 +45,70 @@ if env.FEDEX_TRACKING_USE_SOAP:
 	# For SOAP FedEx API:
 	_SOAP_CLIENT = AsyncSOAPClient('app/modules/tracker/carriers/fedex.wsdl')
 	_SOAP_TYPE_FACTORY = _SOAP_CLIENT.type_factory('ns0')
-	# .WebAuthenticationDetail
-	_SOAP_AUTH = _SOAP_TYPE_FACTORY.WebAuthenticationDetail(
-		ParentCredential={
-			'Key': env.FEDEX_TRACKING_SOAP_PARENT_KEY,
-			'Password': env.FEDEX_TRACKING_SOAP_PARENT_PASSWORD
-		},
-		UserCredential={
-			'Key': env.FEDEX_TRACKING_SOAP_USER_KEY,
-			'Password': env.FEDEX_TRACKING_SOAP_USER_PASSWORD
-		}
-	)
-	# .ClientDetail
-	_SOAP_CLIENT_DETAIL = _SOAP_TYPE_FACTORY.ClientDetail(
-		AccountNumber=env.FEDEX_TRACKING_SOAP_CLIENT_ACCOUNT,
-		MeterNumber=env.FEDEX_TRACKING_SOAP_CLIENT_METER
-	)
-	# .Version
-	_SOAP_VERSION = _SOAP_TYPE_FACTORY.VersionId(
-		ServiceId='trck',
-		Major=env.FEDEX_TRACKING_SOAP_VERSION_MAJOR,
-		Intermediate=env.FEDEX_TRACKING_SOAP_VERSION_MIDDLE,
-		Minor=env.FEDEX_TRACKING_SOAP_VERSION_MINOR
-	)
+
+
+	class SOAPAsyncRequestWithCredentials(Protocol):
+		def __call__(self, operation: ZeepOperationProxy, /, *args, **kwargs) -> Awaitable:
+			pass
+
+	# We don't want to build common objects (like credentials) for every
+	# request we make.
+	# Credentials are complex mutable objects.
+	# Unfortunately, underlying zeep method that build zeep-native objects
+	# from other objects don't accept arbitrary mappings, checking specifically
+	# for builtin dict. To protect credentials from mutations (and ourselves
+	# from potential errors) let's isolate them inside this 'factory'.
+	def _make_request_soap_with_credentials_factory() -> SOAPAsyncRequestWithCredentials:
+		# .WebAuthenticationDetail
+		_SOAP_AUTH = _SOAP_TYPE_FACTORY.WebAuthenticationDetail(
+			ParentCredential={
+				'Key': env.FEDEX_TRACKING_SOAP_PARENT_KEY,
+				'Password': env.FEDEX_TRACKING_SOAP_PARENT_PASSWORD
+			},
+			UserCredential={
+				'Key': env.FEDEX_TRACKING_SOAP_USER_KEY,
+				'Password': env.FEDEX_TRACKING_SOAP_USER_PASSWORD
+			}
+		)
+		# .ClientDetail
+		_SOAP_CLIENT_DETAIL = _SOAP_TYPE_FACTORY.ClientDetail(
+			AccountNumber=env.FEDEX_TRACKING_SOAP_CLIENT_ACCOUNT,
+			MeterNumber=env.FEDEX_TRACKING_SOAP_CLIENT_METER
+		)
+		# .Version
+		_SOAP_VERSION = _SOAP_TYPE_FACTORY.VersionId(
+			ServiceId='trck',
+			Major=env.FEDEX_TRACKING_SOAP_VERSION_MAJOR,
+			Intermediate=env.FEDEX_TRACKING_SOAP_VERSION_MIDDLE,
+			Minor=env.FEDEX_TRACKING_SOAP_VERSION_MINOR
+		)
+
+		async def wrapped(
+			operation: ZeepOperationProxy,
+			/,
+			*args,
+			**kwargs
+		):
+			"""Makes request to SOAP tracking API, returns serialized JSON.
+
+			Injects common credentials into request.
+			`operation_name` - specific operation to call in SOAP service.
+			`*args` and `**kwargs` will be passed to the operation.
+			"""
+			return await operation(
+				*args,
+				WebAuthenticationDetail=_SOAP_AUTH,
+				ClientDetail=_SOAP_CLIENT_DETAIL,
+				Version=_SOAP_VERSION,
+				**kwargs
+			)
+
+		return wrapped
+
+	# This is low-level function that should be used for SOAP requests.
+	# Implements SOAPAsyncRequestWithCredentials.
+	_make_request_soap_with_credentials = _make_request_soap_with_credentials_factory()
+
 else:
 	# For REST FedEx API:
 	_BASE_URL = env.FEDEX_URL
@@ -232,7 +275,7 @@ async def _get_tracking_info_rest_v2(tracking_number: str) -> dict:
 
 
 async def _make_request_soap(operation_name: str, /, *args, **kwargs):
-	"""Makes request to REST tracking API, returns JSON.
+	"""Makes request to SOAP tracking API, returns serialized JSON.
 
 	`operation_name` - specific operation to call in SOAP service.
 	`*args` and `**kwargs` will be passed to the operation.
@@ -245,19 +288,17 @@ async def _make_request_soap(operation_name: str, /, *args, **kwargs):
 		raise FedexTrackingSOAPConnectError('Can\'t get info from FedEx') from e
 
 	try:
-		response = await operation(
+		response = await _make_request_soap_with_credentials(
+			operation,
 			*args,
-			WebAuthenticationDetail=_SOAP_AUTH,
-			ClientDetail=_SOAP_CLIENT_DETAIL,
-			Version=_SOAP_VERSION,
 			**kwargs
 		)
 	except httpx.ConnectError as e:
 		# TODO: logging can be added here
 		# Wrong service address in WSDL file, or service is 'offline', etc.
 		# Unfortunately, zeep doesn't reraise such errors using its own
-		# exception classes, but uses third party package. Let's hope they will
-		# always use it...
+		# exception classes, that's why we catch third party package exceptions.
+		# Let's hope zeep will always use it...
 		raise FedexTrackingSOAPConnectError('Can\'t get info from FedEx') from e
 
 	if response.HighestSeverity != 'SUCCESS':
