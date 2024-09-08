@@ -1,5 +1,4 @@
 -i https://pypi.org/simple
-frozendict==2.4.4
 tornado==6.4.1
 voluptuous==0.15.2
 zeep[async]==4.2.1
