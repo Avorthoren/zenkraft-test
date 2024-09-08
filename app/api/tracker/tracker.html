@@ -11,8 +11,11 @@
         <form onsubmit="trackerSubmit(); return false;">
             <label for="tracking_number">Tracking number:</label><br/>
             <input type="text" id="tracking_number" name="tracking_number"
-                   placeholder="000000000000000" value="{{ default_value }}"
-                   minlength="1" maxlength="{{ max_length }}" required><br/>
+                   placeholder="000000000000000"
+                   value="{{ tacking_number_default_value }}"
+                   size="{{ tracking_number_input_size }}"
+                   minlength="1" maxlength="{{ tacking_number_max_length }}"
+                   required><br/>
             <input type="submit" value="Track shipment"/>
         </form>
     </div>

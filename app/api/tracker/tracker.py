@@ -12,8 +12,9 @@ class TrackerUIHandler(BaseHandler):
 	def get(self):
 		self.render(
 			'tracker.html',
-			default_value=env.TRACKING_NUMBER_DEFAULT_VALUE,
-			max_length=tracker.TRACKING_NUMBER_MAX_LENGTH
+			tacking_number_default_value=env.TRACKING_NUMBER_DEFAULT_VALUE,
+			tracking_number_input_size=tracker.TRACKING_NUMBER_INPUT_SIZE,
+			tacking_number_max_length=tracker.TRACKING_NUMBER_MAX_LENGTH
 		)
 
 

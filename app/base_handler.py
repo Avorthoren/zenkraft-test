@@ -5,6 +5,7 @@ all handlers should inherit from as well as ApplicationError class.
 from contextlib import suppress
 import dataclasses
 import datetime
+from decimal import Decimal
 import enum
 import json
 
@@ -26,9 +27,10 @@ class ApplicationError(tornado.web.HTTPError):
 
 class WideJSONEncoder(json.JSONEncoder):
 	"""Custom json encoder: allows to handle:
+	 - dataclasses
 	 - date/datetime
 	 - enums
-	 - dataclasses
+	 - Decimal
 	"""
 	def default(self, obj):
 		if dataclasses.is_dataclass(obj):
@@ -38,8 +40,12 @@ class WideJSONEncoder(json.JSONEncoder):
 				return dataclasses.asdict(obj)
 
 		# One could just try last line except TypeError: return str(obj),
-		# but let's keep it explicit way:
-		if isinstance(obj, (datetime.date, enum.Enum)):
+		# but let's keep it explicit way and add new types when we need it:
+		if isinstance(obj, (
+			datetime.date,
+			enum.Enum,
+			Decimal
+		)):
 			return str(obj)
 
 		return super().default(obj)

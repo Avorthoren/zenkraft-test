@@ -13,9 +13,9 @@ import voluptuous as vlps
 from .common import CarrierAuthError
 from app.environs import env
 
-
-# Base URL for all authorization requests.
-_BASE_URL = env.FEDEX_URL
+if not env.FEDEX_TRACKING_USE_SOAP:
+	# Base URL for all REST authorization requests.
+	_BASE_URL = env.FEDEX_URL
 
 
 class FedexAuthError(CarrierAuthError):
