@@ -3,8 +3,10 @@
 """
 from app.base_handler import BaseHandler, ApplicationError
 from app.environs import env
-from app.modules.tracker import tracker
+# from app.modules.tracker import tracker
 from app.modules.tracker.carriers.common import CarrierTrackingError
+import app.modules.tracker.tracker as tracker
+
 from app.validation.tracker import USER_REQUEST_SCHEMA
 
 

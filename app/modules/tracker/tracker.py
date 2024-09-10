@@ -3,7 +3,7 @@
 """
 import asyncio
 
-from app.modules.tracker.carriers import fedex
+import app.modules.tracker.carriers.fedex.fedex as fedex
 
 # Let's define it here while we have only one carrier.
 # It looks like it should be no more than 34, but just in case...
