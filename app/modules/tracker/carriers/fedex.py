@@ -41,6 +41,9 @@ from app.carriers_auth import fedex as fedex_auth
 from app.environs import env
 
 
+_BearerGetter_T = Callable[[], Awaitable[str]]
+
+
 if env.FEDEX_TRACKING_USE_SOAP:
 	# For SOAP FedEx API:
 	_SOAP_CLIENT = AsyncSOAPClient('app/modules/tracker/carriers/fedex.wsdl')
@@ -92,7 +95,7 @@ if env.FEDEX_TRACKING_USE_SOAP:
 			"""Makes request to SOAP tracking API, returns serialized JSON.
 
 			Injects common credentials into request.
-			`operation_name` - specific operation to call in SOAP service.
+			`operation` - specific operation to call in SOAP service.
 			`*args` and `**kwargs` will be passed to the operation.
 			"""
 			return await operation(
@@ -114,8 +117,59 @@ else:
 	_BASE_URL = env.FEDEX_URL
 	_API_KEY = env.FEDEX_TRACKING_API_KEY
 	_SECRET_KEY = env.FEDEX_TRACKING_SECRET_KEY
-	# Will be generated (and regenerated) on demand.
-	_BEARER_TOKEN = None
+
+
+	class RESTAsyncRequestWithCredentials(Protocol):
+		def __call__(self, http_client: AsyncHTTPClient, request: HTTPRequest, auth: _BearerGetter_T) -> Awaitable:
+			pass
+
+	def _make_request_rest_with_credentials_factory() -> RESTAsyncRequestWithCredentials:
+		# It will be 'cached' here.
+		_BEARER_TOKEN = None
+
+		async def wrapped(
+			http_client: AsyncHTTPClient,
+			request: HTTPRequest,
+			auth: _BearerGetter_T
+		):
+			"""Makes request to REST tracking API, returns serialized JSON.
+
+			Injects bearer token into request effectively mutating it.
+			`http_client` - to make the request.
+			`request` - prepared request itself.
+			`auth` - to get bearer token.
+			"""
+			# Get bearer token if 'cache' is empty.
+			cold_request = False
+			nonlocal _BEARER_TOKEN
+			if _BEARER_TOKEN is None:
+				cold_request = True
+				_BEARER_TOKEN = await auth()
+			request.headers['Authorization'] = f'Bearer {_BEARER_TOKEN}'
+
+			# Make the request.
+			try:
+				response = await http_client.fetch(request)
+			except HTTPError as e:
+				if not e.code == 401 or cold_request:
+					raise
+				# If we get 401, most probably, the token was expired.
+				# If we haven't just generated fresh token - try to get a new one.
+				# Clean token just in case generation fails.
+				_BEARER_TOKEN = None
+				# Generate fresh token.
+				_BEARER_TOKEN = await auth()
+				request.headers['Authorization'] = f'Bearer {_BEARER_TOKEN}'
+				# Repeat the request with new token.
+				response = await http_client.fetch(request)
+
+			return response
+
+		return wrapped
+
+	# This is low-level function that should be used for REST requests.
+	# Implements RESTAsyncRequestWithCredentials.
+	_make_request_rest_with_credentials = _make_request_rest_with_credentials_factory()
 
 
 class FedexTrackingError(CarrierTrackingError):
@@ -145,8 +199,6 @@ async def _get_bearer_token() -> str:
 async def _get_bearer_token_v2() -> str:
 	return await fedex_auth.get_auth_token_v2(api_key=_API_KEY, secret_key=_SECRET_KEY)
 
-_BearerGetter_T = Callable[[], Awaitable[str]]
-
 
 async def _make_request_rest(
 	endpoint: str,
@@ -167,30 +219,7 @@ async def _make_request_rest(
 	http_client = AsyncHTTPClient()
 	request = HTTPRequest(url=_BASE_URL + endpoint, method=method, body=body, headers=headers)
 
-	# Handle authorization.
-	cold_request = False
-	global _BEARER_TOKEN
-	if _BEARER_TOKEN is None:
-		cold_request = True
-		_BEARER_TOKEN = await auth()
-	request.headers['Authorization'] = f'Bearer {_BEARER_TOKEN}'
-
-	# Make the request.
-	try:
-		response = await http_client.fetch(request)
-	except HTTPError as e:
-		# If we get 401, most probably, the token was expired.
-		# If we haven't just generated fresh token - try to get a new one.
-		if e.code == 401 and not cold_request:
-			# Clean token just in case generation fails.
-			_BEARER_TOKEN = None
-			# Generate fresh token.
-			_BEARER_TOKEN = await auth()
-			request.headers['Authorization'] = f'Bearer {_BEARER_TOKEN}'
-			# Repeat the request with new token.
-			response = await http_client.fetch(request)
-		else:
-			raise
+	response = await _make_request_rest_with_credentials(http_client, request, auth)
 
 	raw_body = response.body.decode()
 	response_data = json.loads(raw_body)
