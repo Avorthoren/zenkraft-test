@@ -3,7 +3,6 @@
 """
 from app.base_handler import BaseHandler, ApplicationError
 from app.environs import env
-# from app.modules.tracker import tracker
 from app.modules.tracker.carriers.common import CarrierTrackingError
 import app.modules.tracker.tracker as tracker
 
@@ -14,9 +13,9 @@ class TrackerUIHandler(BaseHandler):
 	def get(self):
 		self.render(
 			'tracker.html',
-			tacking_number_default_value=env.TRACKING_NUMBER_DEFAULT_VALUE,
+			tracking_number_default_value=env.TRACKING_NUMBER_DEFAULT_VALUE,
 			tracking_number_input_size=tracker.TRACKING_NUMBER_INPUT_SIZE,
-			tacking_number_max_length=tracker.TRACKING_NUMBER_MAX_LENGTH
+			tracking_number_max_length=tracker.TRACKING_NUMBER_MAX_LENGTH
 		)
 
 
